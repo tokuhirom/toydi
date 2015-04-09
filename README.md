@@ -13,6 +13,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 
 本稿では､おもちゃの DI ライブラリ､ToyDI を作成していく｡このライブラリは Google Guice のサブセットのような機能を持つことになる予定だ｡
 
+```java
 	public class ToyDI {
 		public ToyDI() {
 		}
@@ -25,11 +26,13 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 			}
 		}
 	}
+```
 
 単純にクラスを生成するだけならば､このように､getInstance メソッドを実装すればよろしい｡単純な reflection である｡
 
 このクラスを利用するコードは以下のようになる｡
 
+```java
 	public class ToyDITest {
 		@Test
 		public void testNewInstance() {
@@ -41,6 +44,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 		public static class Foo {
 		}
 	}
+```
 
 これだけでは､全く意味がないので次へ進もう｡
 
@@ -52,6 +56,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 
 テストコードは以下のようになります｡Foo の bar というフィールドに､自動的にインスタンスを埋めるようになります｡
 
+```java
     public class ToyDITest {
         @Test
         public void testV2() throws Exception {
@@ -71,10 +76,12 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
         public static class Bar {
         }
     }
+```
 
 以下のように､フィールド一覧を取得して @Inject アノテーションが付いているものの一覧を取得して､必要なインスタンスを埋めればいいですね｡
 コードとしては得に凝ったことはしておらず､簡単です｡
 
+```java
     public class ToyDI {
         public ToyDI() {
         }
@@ -97,6 +104,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
             }
         }
     }
+```
 
 ## DI 前提ではないクラスのインジェクト
 
@@ -105,23 +113,28 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 
 たとえば以下のようにファクトリを定義します｡DI 用のファクトリには javax.inject.Provider インターフェースを実装するようにします｡
 
+```java
 	public static class ConnectionProvider implements Provider<Connection> {
 		public Connection get() {
 			return new Connection("jdbc:mysql:localhost", "root", "");
 		}
 	}
+```
 
 次に､どの Provider を利用するか､という設定を一個ずつ渡していると大変なので､Provider を管理する存在として Module というクラスを定義します｡
 
+```java
 	public static class BasicModule implements ModuleV3 {
 	    @Override
 		public void configure(ToyDIV3 di) {
 			di.registerProvider(Connection.class, ConnectionProvider.class);
 		}
 	}
+```
 
 最後に､ToyDI で Provider/Module を利用するように変更しましょう｡
 
+```java
     public class ToyDIV3 {
         private final Map<Class<?>, Class<? extends Provider<?>>> providers;
 
@@ -161,20 +174,24 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
             }
         }
     }
+```
 
 利用時には以下のようにしましょう｡Module を渡すようになったのが大きな違いです｡
 
+```java
 		ToyDIV3 di = new ToyDIV3(new BasicModule());
 		Foo foo = di.getInstance(Foo.class);
 		Connection connection = foo.getConnection();
 		assertThat(connection.getUrl())
 				.isEqualTo("jdbc:mysql:localhost");
+```
 
 ## Provider も DI ライブラリがインスタンス作成するよ
 
 `Provider<Connection>` のインスタンスも DI コンテナから取得されます｡つまり､Provider にも @Inject アノテーションが適用可能です｡
 これにより､例えば設定を読み込むプロバイダが返す設定情報を元に､DB コネクションを作る､なんてことも実装可能です｡
 
+```java
 	@Test
 	public void test() throws Exception {
 		ToyDIV3 di = new ToyDIV3(new BasicModule());
@@ -231,6 +248,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 			return new ConnectionConfig("jdbc:mysql:localhost", "root", "");
 		}
 	}
+```
 
 ## 一度作ったインスタンスは使いまわしてほしい｡
 
@@ -244,6 +262,7 @@ Provider からインスタンスを取得する部分の処理を 1 つのイ�
 Provider からのインスタンス取得の処理を汎化するためにインターフェースを定義します｡
 initialize() メソッドは､モジュールの初期化がすべて完了したタイミングで呼ばれます｡ getInstance メソッドは､インスタンスの取得が行われるタイミングで呼ばれます｡
 
+```java
     public interface ProviderConfig<T> {
     	/**
     	 * ToyDI calls this after initializing modules.
@@ -255,9 +274,11 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
     	public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
     			NoSuchMethodException, InvocationTargetException;
     }
+```
 
 次に､通常のインスタンス取得処理を記述します｡今までのインスタンス取得処理とほとんど同じです｡
 
+```java
     public class NormalProviderConfig<T> implements ProviderConfig<T> {
         @Getter
         private Class<? extends Provider<T>> providerClass;
@@ -273,9 +294,11 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
             return provider.get();
         }
     }
+```
 
 最後にシングルトンの場合のインスタンス取得処理を記述します｡これは､一度インスタンスを作成したら､そのまま使い続けるようになっています｡
 
+```java
     public class SingletonProviderConfig<T> implements ProviderConfig<T> {
         private Class<? extends Provider<T>> providerClass;
         private T instance;
@@ -298,9 +321,11 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
             return instance;
         }
     }
+```
 
 そして､これらを利用するように DI の instance 取得処理を以下のように変更しましょう｡
 
+```java
 	public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException,
 			NoSuchMethodException, InvocationTargetException {
 		final ProviderConfig<T> providerConfig = (ProviderConfig<T>)providers.get(classType);
@@ -321,6 +346,7 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
 	public <T> void register(Class<T> type, ProviderConfig<T> providerConfig) {
 		providers.put(type, providerConfig);
 	}
+```
 
 ## 出来合いのインスタンスを渡したいんだけど｡｡
 
@@ -328,6 +354,7 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
 
 InstanceProviderConfig を定義します｡単に､インスタンスを返すだけなので簡単ですね｡
 
+```java
     public class InstanceProviderConfig<T> implements ProviderConfig<T> {
         private T instance;
 
@@ -346,9 +373,11 @@ InstanceProviderConfig を定義します｡単に､インスタンスを返す
             return instance;
         }
     }
+```
 
 最後に利用例です｡Instance を直接モジュールで設定します｡
 
+```java
     	public static class BasicModule implements Module {
     		private final Foo foo;
 
@@ -362,7 +391,7 @@ InstanceProviderConfig を定義します｡単に､インスタンスを返す
     			di.register(Foo.class, new InstanceProviderConfig<>(foo));
     		}
     	}
-
+```
 
 ## 設定は起動時に読み込んでほしい
 
@@ -374,6 +403,7 @@ InstanceProviderConfig を定義します｡単に､インスタンスを返す
 
 EagerSingletonProviderConfig というクラスを設定します｡initialize 時にインスタンスを生成します｡
 
+```java
     public class EagerSingletonProviderConfig<T> implements ProviderConfig<T> {
         private Class<? extends Provider<T>> providerClass;
         private T instance;
@@ -395,9 +425,11 @@ EagerSingletonProviderConfig というクラスを設定します｡initialize �
             return instance;
         }
     }
+```
 
 この機能を利用するためのコードは以下のようになるでしょう｡
 
+```java
 	public static class BasicModule implements Module {
 		@Override
 		public void configure(ToyDI di) throws InstantiationException, IllegalAccessException,
@@ -424,6 +456,7 @@ EagerSingletonProviderConfig というクラスを設定します｡initialize �
 			return instanceCount;
 		}
 	}
+```
 
 ## 閑話休題｡ところで､@Inject や Provider ってどこから来てるの?
 
@@ -441,6 +474,7 @@ JSR ってのは､Java 界の RFC みたいなやつです｡
 そんな時は､そのフィールドに対するインジェクションのタイミングを遅らせたほうが良いですね｡
 以下のように､Provider をフィールドに設定し､それを Inject 対象にすることで､インスタンスの取得を遅らせることができます｡
 
+```java
 	public static class Foo {
 		@Inject
 		private Provider<Bar> bar;
@@ -461,9 +495,11 @@ JSR ってのは､Java 界の RFC みたいなやつです｡
 			return "Get!";
 		}
 	}
+```
 
 DI 側は以下のように､インジェクト対象が Provider であった場合には､遅延評価を行う lambda をインジェクトするようにします｡
 
+```java
 	private void instantiateMember(final Object object, final Field field)
 			throws IllegalAccessException, InstantiationException, NoSuchMethodException,
 			InvocationTargetException {
@@ -497,6 +533,7 @@ DI 側は以下のように､インジェクト対象が Provider であった�
 			}
 		};
 	}
+```
 
 ## 落穂ひろい
 

@@ -14,18 +14,18 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 本稿では､おもちゃの DI ライブラリ､ToyDI を作成していく｡このライブラリは Google Guice のサブセットのような機能を持つことになる予定だ｡
 
 ```java
-	public class ToyDI {
-		public ToyDI() {
-		}
+public class ToyDI {
+	public ToyDI() {
+	}
 
-		public <T> T getInstance(Class<T> classType) {
-			try {
-				return classType.newInstance();
-			} catch (InstantiationException|IllegalAccessException e) {
-				throw new RuntimeException(e);
-			}
+	public <T> T getInstance(Class<T> classType) {
+		try {
+			return classType.newInstance();
+		} catch (InstantiationException|IllegalAccessException e) {
+			throw new RuntimeException(e);
 		}
 	}
+}
 ```
 
 単純にクラスを生成するだけならば､このように､getInstance メソッドを実装すればよろしい｡単純な reflection である｡
@@ -33,17 +33,17 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 このクラスを利用するコードは以下のようになる｡
 
 ```java
-	public class ToyDITest {
-		@Test
-		public void testNewInstance() {
-			Foo foo = new ToyDI().getInstance(Foo.class);
-			assertThat(foo)
-					.isInstanceOf(Foo.class);
-		}
-
-		public static class Foo {
-		}
+public class ToyDITest {
+	@Test
+	public void testNewInstance() {
+		Foo foo = new ToyDI().getInstance(Foo.class);
+		assertThat(foo)
+				.isInstanceOf(Foo.class);
 	}
+
+	public static class Foo {
+	}
+}
 ```
 
 これだけでは､全く意味がないので次へ進もう｡
@@ -57,53 +57,53 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 テストコードは以下のようになります｡Foo の bar というフィールドに､自動的にインスタンスを埋めるようになります｡
 
 ```java
-    public class ToyDITest {
-        @Test
-        public void testV2() throws Exception {
-            Foo foo = new ToyDI().getInstance(Foo.class);
-            assertThat(foo)
-                .isInstanceOf(Foo.class);
-            assertThat(foo.getBar())
-                    .isInstanceOf(Bar.class);
-        }
-
-        @Getter
-        public static class Foo {
-            @Inject
-            private Bar bar;
-        }
-
-        public static class Bar {
-        }
+public class ToyDITest {
+    @Test
+    public void testV2() throws Exception {
+        Foo foo = new ToyDI().getInstance(Foo.class);
+        assertThat(foo)
+            .isInstanceOf(Foo.class);
+        assertThat(foo.getBar())
+                .isInstanceOf(Bar.class);
     }
+
+    @Getter
+    public static class Foo {
+        @Inject
+        private Bar bar;
+    }
+
+    public static class Bar {
+    }
+}
 ```
 
 以下のように､フィールド一覧を取得して @Inject アノテーションが付いているものの一覧を取得して､必要なインスタンスを埋めればいいですね｡
 コードとしては得に凝ったことはしておらず､簡単です｡
 
 ```java
-    public class ToyDI {
-        public ToyDI() {
-        }
+public class ToyDI {
+    public ToyDI() {
+    }
 
-        public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException {
-                T instance = classType.newInstance();
-                this.instantiateMembers(instance);
-                return instance;
-        }
+    public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException {
+            T instance = classType.newInstance();
+            this.instantiateMembers(instance);
+            return instance;
+    }
 
-        public void instantiateMembers(Object object) throws IllegalAccessException, InstantiationException {
-            for (final Field field : object.getClass().getDeclaredFields()) {
-                Inject inject = field.getAnnotation(Inject.class);
-                if (inject != null) {
-                    field.setAccessible(true);
-                    final Class<?> type = field.getType();
-                    Object value = this.getInstance(type);
-                    field.set(object, value);
-                }
+    public void instantiateMembers(Object object) throws IllegalAccessException, InstantiationException {
+        for (final Field field : object.getClass().getDeclaredFields()) {
+            Inject inject = field.getAnnotation(Inject.class);
+            if (inject != null) {
+                field.setAccessible(true);
+                final Class<?> type = field.getType();
+                Object value = this.getInstance(type);
+                field.set(object, value);
             }
         }
     }
+}
 ```
 
 ## DI 前提ではないクラスのインジェクト
@@ -114,76 +114,76 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 たとえば以下のようにファクトリを定義します｡DI 用のファクトリには javax.inject.Provider インターフェースを実装するようにします｡
 
 ```java
-	public static class ConnectionProvider implements Provider<Connection> {
-		public Connection get() {
-			return new Connection("jdbc:mysql:localhost", "root", "");
-		}
+public static class ConnectionProvider implements Provider<Connection> {
+	public Connection get() {
+		return new Connection("jdbc:mysql:localhost", "root", "");
 	}
+}
 ```
 
 次に､どの Provider を利用するか､という設定を一個ずつ渡していると大変なので､Provider を管理する存在として Module というクラスを定義します｡
 
 ```java
-	public static class BasicModule implements ModuleV3 {
-	    @Override
-		public void configure(ToyDIV3 di) {
-			di.registerProvider(Connection.class, ConnectionProvider.class);
-		}
+public static class BasicModule implements ModuleV3 {
+    @Override
+	public void configure(ToyDIV3 di) {
+		di.registerProvider(Connection.class, ConnectionProvider.class);
 	}
+}
 ```
 
 最後に､ToyDI で Provider/Module を利用するように変更しましょう｡
 
 ```java
-    public class ToyDIV3 {
-        private final Map<Class<?>, Class<? extends Provider<?>>> providers;
+public class ToyDIV3 {
+    private final Map<Class<?>, Class<? extends Provider<?>>> providers;
 
-        public ToyDIV3(ModuleV3... modules) {
-            providers = new HashMap<>();
-            for (ModuleV3 module: modules) {
-                module.configure(this);
-            }
+    public ToyDIV3(ModuleV3... modules) {
+        providers = new HashMap<>();
+        for (ModuleV3 module: modules) {
+            module.configure(this);
         }
+    }
 
-        public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException {
-            final Class<? extends Provider<?>> providerClass = providers.get(classType);
-            if (providerClass != null) {
-                final Provider<?> provider = this.getInstance(providerClass);
-                Object instance = provider.get();
-                return (T) instance;
-            } else {
-                T instance = classType.newInstance();
-                this.instantiateMembers(instance);
-                return instance;
-            }
+    public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException {
+        final Class<? extends Provider<?>> providerClass = providers.get(classType);
+        if (providerClass != null) {
+            final Provider<?> provider = this.getInstance(providerClass);
+            Object instance = provider.get();
+            return (T) instance;
+        } else {
+            T instance = classType.newInstance();
+            this.instantiateMembers(instance);
+            return instance;
         }
+    }
 
-        public <T> void registerProvider(Class<T> type, Class<? extends Provider<T>> provider) {
-            providers.put(type, provider);
-        }
+    public <T> void registerProvider(Class<T> type, Class<? extends Provider<T>> provider) {
+        providers.put(type, provider);
+    }
 
-        public void instantiateMembers(Object object) throws IllegalAccessException, InstantiationException {
-            for (final Field field : object.getClass().getDeclaredFields()) {
-                Inject inject = field.getAnnotation(Inject.class);
-                if (inject != null) {
-                    field.setAccessible(true);
-                    final Class<?> type = field.getType();
-                    Object value = this.getInstance(type);
-                    field.set(object, value);
-                }
+    public void instantiateMembers(Object object) throws IllegalAccessException, InstantiationException {
+        for (final Field field : object.getClass().getDeclaredFields()) {
+            Inject inject = field.getAnnotation(Inject.class);
+            if (inject != null) {
+                field.setAccessible(true);
+                final Class<?> type = field.getType();
+                Object value = this.getInstance(type);
+                field.set(object, value);
             }
         }
     }
+}
 ```
 
 利用時には以下のようにしましょう｡Module を渡すようになったのが大きな違いです｡
 
 ```java
-		ToyDIV3 di = new ToyDIV3(new BasicModule());
-		Foo foo = di.getInstance(Foo.class);
-		Connection connection = foo.getConnection();
-		assertThat(connection.getUrl())
-				.isEqualTo("jdbc:mysql:localhost");
+ToyDIV3 di = new ToyDIV3(new BasicModule());
+Foo foo = di.getInstance(Foo.class);
+Connection connection = foo.getConnection();
+assertThat(connection.getUrl())
+		.isEqualTo("jdbc:mysql:localhost");
 ```
 
 ## Provider も DI ライブラリがインスタンス作成するよ
@@ -192,62 +192,62 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 これにより､例えば設定を読み込むプロバイダが返す設定情報を元に､DB コネクションを作る､なんてことも実装可能です｡
 
 ```java
-	@Test
-	public void test() throws Exception {
-		ToyDIV3 di = new ToyDIV3(new BasicModule());
-		Foo foo = di.getInstance(Foo.class);
-		Connection connection = foo.getConnection();
-		assertThat(connection.getUrl())
-				.isEqualTo("jdbc:mysql:localhost");
+@Test
+public void test() throws Exception {
+	ToyDIV3 di = new ToyDIV3(new BasicModule());
+	Foo foo = di.getInstance(Foo.class);
+	Connection connection = foo.getConnection();
+	assertThat(connection.getUrl())
+			.isEqualTo("jdbc:mysql:localhost");
+}
+
+@Getter
+public static class Foo {
+	@Inject
+	private Connection connection;
+}
+
+@Getter
+public static class Connection {
+	private String url;
+	private String username;
+	private String password;
+
+	public Connection(String url, String username, String password) {
+		this.url = url;
+		this.username = username;
+		this.password = password;
 	}
+}
 
-	@Getter
-	public static class Foo {
-		@Inject
-		private Connection connection;
+@Value
+public static class ConnectionConfig {
+	private String url;
+	private String username;
+	private String password;
+}
+
+public static class BasicModule implements ModuleV3 {
+	public void configure(ToyDIV3 di) {
+		di.registerProvider(Connection.class, ConnectionProvider.class);
+		di.registerProvider(ConnectionConfig.class, ConnectionConfigProvider.class);
 	}
+}
 
-	@Getter
-	public static class Connection {
-		private String url;
-		private String username;
-		private String password;
+public static class ConnectionProvider implements Provider<Connection> {
+	@Inject
+	private ConnectionConfig config;
 
-		public Connection(String url, String username, String password) {
-			this.url = url;
-			this.username = username;
-			this.password = password;
-		}
+	public Connection get() {
+		return new Connection(config.getUrl(), config.getUsername(), config.getPassword());
 	}
+}
 
-	@Value
-	public static class ConnectionConfig {
-		private String url;
-		private String username;
-		private String password;
+public static class ConnectionConfigProvider implements Provider<ConnectionConfig> {
+	public ConnectionConfig get() {
+		return new ConnectionConfig("jdbc:mysql:localhost", "root", "");
 	}
-
-	public static class BasicModule implements ModuleV3 {
-		public void configure(ToyDIV3 di) {
-			di.registerProvider(Connection.class, ConnectionProvider.class);
-			di.registerProvider(ConnectionConfig.class, ConnectionConfigProvider.class);
-		}
-	}
-
-	public static class ConnectionProvider implements Provider<Connection> {
-		@Inject
-		private ConnectionConfig config;
-
-		public Connection get() {
-			return new Connection(config.getUrl(), config.getUsername(), config.getPassword());
-		}
-	}
-
-	public static class ConnectionConfigProvider implements Provider<ConnectionConfig> {
-		public ConnectionConfig get() {
-			return new ConnectionConfig("jdbc:mysql:localhost", "root", "");
-		}
-	}
+}
 ```
 
 ## 一度作ったインスタンスは使いまわしてほしい｡
@@ -263,89 +263,89 @@ Provider からのインスタンス取得の処理を汎化するためにイ�
 initialize() メソッドは､モジュールの初期化がすべて完了したタイミングで呼ばれます｡ getInstance メソッドは､インスタンスの取得が行われるタイミングで呼ばれます｡
 
 ```java
-    public interface ProviderConfig<T> {
-    	/**
-    	 * ToyDI calls this after initializing modules.
-    	 */
-    	default public void initialize(ToyDI di)
-    			throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        }
-
-    	public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
-    			NoSuchMethodException, InvocationTargetException;
+public interface ProviderConfig<T> {
+	/**
+	 * ToyDI calls this after initializing modules.
+	 */
+	default public void initialize(ToyDI di)
+			throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
     }
+
+	public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
+			NoSuchMethodException, InvocationTargetException;
+}
 ```
 
 次に､通常のインスタンス取得処理を記述します｡今までのインスタンス取得処理とほとんど同じです｡
 
 ```java
-    public class NormalProviderConfig<T> implements ProviderConfig<T> {
-        @Getter
-        private Class<? extends Provider<T>> providerClass;
+public class NormalProviderConfig<T> implements ProviderConfig<T> {
+    @Getter
+    private Class<? extends Provider<T>> providerClass;
 
-        public NormalProviderConfig(Class<? extends Provider<T>> providerClass) {
-            this.providerClass = providerClass;
-        }
-
-        @Override
-        public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
-                NoSuchMethodException, InvocationTargetException {
-            Provider<T> provider = di.getInstance(providerClass);
-            return provider.get();
-        }
+    public NormalProviderConfig(Class<? extends Provider<T>> providerClass) {
+        this.providerClass = providerClass;
     }
+
+    @Override
+    public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
+            NoSuchMethodException, InvocationTargetException {
+        Provider<T> provider = di.getInstance(providerClass);
+        return provider.get();
+    }
+}
 ```
 
 最後にシングルトンの場合のインスタンス取得処理を記述します｡これは､一度インスタンスを作成したら､そのまま使い続けるようになっています｡
 
 ```java
-    public class SingletonProviderConfig<T> implements ProviderConfig<T> {
-        private Class<? extends Provider<T>> providerClass;
-        private T instance;
+public class SingletonProviderConfig<T> implements ProviderConfig<T> {
+    private Class<? extends Provider<T>> providerClass;
+    private T instance;
 
-        public SingletonProviderConfig(Class<? extends Provider<T>> providerClass) {
-            this.providerClass = providerClass;
-        }
+    public SingletonProviderConfig(Class<? extends Provider<T>> providerClass) {
+        this.providerClass = providerClass;
+    }
 
-        @Override
-        public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
-                NoSuchMethodException, InvocationTargetException {
-            if (instance != null) {
-                return instance;
-            }
-            Provider<T> provider = di.getInstance(providerClass);
-            instance = provider.get();
-            if (instance == null) {
-                throw new NullPointerException("Provider returns null: " + provider);
-            }
+    @Override
+    public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
+            NoSuchMethodException, InvocationTargetException {
+        if (instance != null) {
             return instance;
         }
+        Provider<T> provider = di.getInstance(providerClass);
+        instance = provider.get();
+        if (instance == null) {
+            throw new NullPointerException("Provider returns null: " + provider);
+        }
+        return instance;
     }
+}
 ```
 
 そして､これらを利用するように DI の instance 取得処理を以下のように変更しましょう｡
 
 ```java
-	public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException,
-			NoSuchMethodException, InvocationTargetException {
-		final ProviderConfig<T> providerConfig = (ProviderConfig<T>)providers.get(classType);
-		if (providerConfig != null) {
-			return providerConfig.getInstance(this);
-		} else {
-			try {
-				final Constructor<T> constructor = classType.getConstructor();
-				T instance = constructor.newInstance();
-				this.instantiateMembers(instance);
-				return instance;
-			} catch (NoSuchMethodException e) {
-				throw new RuntimeException("There is no default constructor or provider: " + classType.getName());
-			}
+public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException,
+		NoSuchMethodException, InvocationTargetException {
+	final ProviderConfig<T> providerConfig = (ProviderConfig<T>)providers.get(classType);
+	if (providerConfig != null) {
+		return providerConfig.getInstance(this);
+	} else {
+		try {
+			final Constructor<T> constructor = classType.getConstructor();
+			T instance = constructor.newInstance();
+			this.instantiateMembers(instance);
+			return instance;
+		} catch (NoSuchMethodException e) {
+			throw new RuntimeException("There is no default constructor or provider: " + classType.getName());
 		}
 	}
+}
 
-	public <T> void register(Class<T> type, ProviderConfig<T> providerConfig) {
-		providers.put(type, providerConfig);
-	}
+public <T> void register(Class<T> type, ProviderConfig<T> providerConfig) {
+	providers.put(type, providerConfig);
+}
 ```
 
 ## 出来合いのインスタンスを渡したいんだけど｡｡
@@ -355,42 +355,42 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
 InstanceProviderConfig を定義します｡単に､インスタンスを返すだけなので簡単ですね｡
 
 ```java
-    public class InstanceProviderConfig<T> implements ProviderConfig<T> {
-        private T instance;
+public class InstanceProviderConfig<T> implements ProviderConfig<T> {
+    private T instance;
 
-        public InstanceProviderConfig(T instance) {
-            this.instance = instance;
-        }
-
-        @Override
-        public void initialize(final ToyDI di)
-                throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        }
-
-        @Override
-        public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
-                NoSuchMethodException, InvocationTargetException {
-            return instance;
-        }
+    public InstanceProviderConfig(T instance) {
+        this.instance = instance;
     }
+
+    @Override
+    public void initialize(final ToyDI di)
+            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    }
+
+    @Override
+    public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
+            NoSuchMethodException, InvocationTargetException {
+        return instance;
+    }
+}
 ```
 
 最後に利用例です｡Instance を直接モジュールで設定します｡
 
 ```java
-    	public static class BasicModule implements Module {
-    		private final Foo foo;
+public static class BasicModule implements Module {
+	private final Foo foo;
 
-    		public BasicModule(Foo foo) {
-    			this.foo = foo;
-    		}
+	public BasicModule(Foo foo) {
+		this.foo = foo;
+	}
 
-    		@Override
-    		public void configure(ToyDI di) throws InstantiationException, IllegalAccessException,
-    				NoSuchMethodException, InvocationTargetException {
-    			di.register(Foo.class, new InstanceProviderConfig<>(foo));
-    		}
-    	}
+	@Override
+	public void configure(ToyDI di) throws InstantiationException, IllegalAccessException,
+			NoSuchMethodException, InvocationTargetException {
+		di.register(Foo.class, new InstanceProviderConfig<>(foo));
+	}
+}
 ```
 
 ## 設定は起動時に読み込んでほしい
@@ -404,58 +404,58 @@ InstanceProviderConfig を定義します｡単に､インスタンスを返す
 EagerSingletonProviderConfig というクラスを設定します｡initialize 時にインスタンスを生成します｡
 
 ```java
-    public class EagerSingletonProviderConfig<T> implements ProviderConfig<T> {
-        private Class<? extends Provider<T>> providerClass;
-        private T instance;
+public class EagerSingletonProviderConfig<T> implements ProviderConfig<T> {
+    private Class<? extends Provider<T>> providerClass;
+    private T instance;
 
-        public EagerSingletonProviderConfig(final Class<? extends Provider<T>> providerClass) {
-            this.providerClass = providerClass;
-        }
-
-        @Override
-        public void initialize(final ToyDI di)
-                throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-            Provider<T> provider = di.getInstance(providerClass);
-            instance = provider.get();
-        }
-
-        @Override
-        public T getInstance(final ToyDI di)
-                throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-            return instance;
-        }
+    public EagerSingletonProviderConfig(final Class<? extends Provider<T>> providerClass) {
+        this.providerClass = providerClass;
     }
+
+    @Override
+    public void initialize(final ToyDI di)
+            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+        Provider<T> provider = di.getInstance(providerClass);
+        instance = provider.get();
+    }
+
+    @Override
+    public T getInstance(final ToyDI di)
+            throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+        return instance;
+    }
+}
 ```
 
 この機能を利用するためのコードは以下のようになるでしょう｡
 
 ```java
-	public static class BasicModule implements Module {
-		@Override
-		public void configure(ToyDI di) throws InstantiationException, IllegalAccessException,
-				NoSuchMethodException, InvocationTargetException {
-			di.register(Foo.class, new EagerSingletonProviderConfig<>(FooProvider.class));
-		}
+public static class BasicModule implements Module {
+	@Override
+	public void configure(ToyDI di) throws InstantiationException, IllegalAccessException,
+			NoSuchMethodException, InvocationTargetException {
+		di.register(Foo.class, new EagerSingletonProviderConfig<>(FooProvider.class));
+	}
+}
+
+public static class FooProvider implements Provider<Foo> {
+	@Override
+	public Foo get() {
+		return new Foo();
+	}
+}
+
+public static class Foo {
+	private static int instanceCount = 0;
+
+	public Foo() {
+		instanceCount++;
 	}
 
-	public static class FooProvider implements Provider<Foo> {
-		@Override
-		public Foo get() {
-			return new Foo();
-		}
+	public static int getInstanceCount() {
+		return instanceCount;
 	}
-
-	public static class Foo {
-		private static int instanceCount = 0;
-
-		public Foo() {
-			instanceCount++;
-		}
-
-		public static int getInstanceCount() {
-			return instanceCount;
-		}
-	}
+}
 ```
 
 ## 閑話休題｡ところで､@Inject や Provider ってどこから来てるの?
@@ -475,64 +475,64 @@ JSR ってのは､Java 界の RFC みたいなやつです｡
 以下のように､Provider をフィールドに設定し､それを Inject 対象にすることで､インスタンスの取得を遅らせることができます｡
 
 ```java
-	public static class Foo {
-		@Inject
-		private Provider<Bar> bar;
+public static class Foo {
+	@Inject
+	private Provider<Bar> bar;
 
-		public String getMessage() {
-			System.out.println("Foo::getMessage");
-			return bar.get().getMessage();
-		}
+	public String getMessage() {
+		System.out.println("Foo::getMessage");
+		return bar.get().getMessage();
+	}
+}
+
+public static class Bar {
+	public Bar() {
+		System.out.println("Bar::new");
 	}
 
-	public static class Bar {
-		public Bar() {
-			System.out.println("Bar::new");
-		}
-
-		public String getMessage() {
-			System.out.println("Bar::getMessage");
-			return "Get!";
-		}
+	public String getMessage() {
+		System.out.println("Bar::getMessage");
+		return "Get!";
 	}
+}
 ```
 
 DI 側は以下のように､インジェクト対象が Provider であった場合には､遅延評価を行う lambda をインジェクトするようにします｡
 
 ```java
-	private void instantiateMember(final Object object, final Field field)
-			throws IllegalAccessException, InstantiationException, NoSuchMethodException,
-			InvocationTargetException {
-		final Class<?> type = field.getType();
-		if (type.isAssignableFrom(Provider.class)) {
-			final Type genericType = field.getGenericType();
-			if (genericType instanceof ParameterizedType) {
-				final Type type1 = ((ParameterizedType)genericType).getActualTypeArguments()[0];
-				if (type1 instanceof Class) {
-					Provider<?> value = this.getProvider((Class<?>)type1);
-					field.set(object, value);
-				} else {
-					throw new IllegalStateException();
-				}
+private void instantiateMember(final Object object, final Field field)
+		throws IllegalAccessException, InstantiationException, NoSuchMethodException,
+		InvocationTargetException {
+	final Class<?> type = field.getType();
+	if (type.isAssignableFrom(Provider.class)) {
+		final Type genericType = field.getGenericType();
+		if (genericType instanceof ParameterizedType) {
+			final Type type1 = ((ParameterizedType)genericType).getActualTypeArguments()[0];
+			if (type1 instanceof Class) {
+				Provider<?> value = this.getProvider((Class<?>)type1);
+				field.set(object, value);
 			} else {
 				throw new IllegalStateException();
 			}
 		} else {
-			Object value = this.getInstance(type);
-			field.set(object, value);
+			throw new IllegalStateException();
 		}
+	} else {
+		Object value = this.getInstance(type);
+		field.set(object, value);
 	}
+}
 
-	private Provider<?> getProvider(Class<?> type) {
-		return () -> {
-			try {
-				return this.getInstance(type);
-			} catch (InstantiationException | IllegalAccessException | InvocationTargetException
-					| NoSuchMethodException e) {
-				throw new RuntimeException(e);
-			}
-		};
-	}
+private Provider<?> getProvider(Class<?> type) {
+	return () -> {
+		try {
+			return this.getInstance(type);
+		} catch (InstantiationException | IllegalAccessException | InvocationTargetException
+				| NoSuchMethodException e) {
+			throw new RuntimeException(e);
+		}
+	};
+}
 ```
 
 ## 落穂ひろい

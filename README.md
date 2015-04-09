@@ -41,8 +41,8 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 		public static class Foo {
 		}
 	}
-	
-これだけでは､全く意味がないので次へ進もう｡	
+
+これだけでは､全く意味がないので次へ進もう｡
 
 ## フィールドに値を埋める｡
 
@@ -61,13 +61,13 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
             assertThat(foo.getBar())
                     .isInstanceOf(Bar.class);
         }
-    
+
         @Getter
         public static class Foo {
             @Inject
             private Bar bar;
         }
-    
+
         public static class Bar {
         }
     }
@@ -78,13 +78,13 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
     public class ToyDI {
         public ToyDI() {
         }
-    
+
         public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException {
                 T instance = classType.newInstance();
                 this.instantiateMembers(instance);
                 return instance;
         }
-    
+
         public void instantiateMembers(Object object) throws IllegalAccessException, InstantiationException {
             for (final Field field : object.getClass().getDeclaredFields()) {
                 Inject inject = field.getAnnotation(Inject.class);
@@ -119,7 +119,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
 			di.registerProvider(Connection.class, ConnectionProvider.class);
 		}
 	}
-	
+
 最後に､ToyDI で Provider/Module を利用するように変更しましょう｡
 
     public class ToyDIV3 {
@@ -131,7 +131,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
                 module.configure(this);
             }
         }
-    
+
         public <T> T getInstance(Class<T> classType) throws InstantiationException, IllegalAccessException {
             final Class<? extends Provider<?>> providerClass = providers.get(classType);
             if (providerClass != null) {
@@ -148,7 +148,7 @@ LL のメタプログラミングとたいして変わらないのだが､裏�
         public <T> void registerProvider(Class<T> type, Class<? extends Provider<T>> provider) {
             providers.put(type, provider);
         }
-    
+
         public void instantiateMembers(Object object) throws IllegalAccessException, InstantiationException {
             for (final Field field : object.getClass().getDeclaredFields()) {
                 Inject inject = field.getAnnotation(Inject.class);
@@ -251,7 +251,7 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
     	default public void initialize(ToyDI di)
     			throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         }
-    
+
     	public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
     			NoSuchMethodException, InvocationTargetException;
     }
@@ -261,11 +261,11 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
     public class NormalProviderConfig<T> implements ProviderConfig<T> {
         @Getter
         private Class<? extends Provider<T>> providerClass;
-    
+
         public NormalProviderConfig(Class<? extends Provider<T>> providerClass) {
             this.providerClass = providerClass;
         }
-    
+
         @Override
         public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
                 NoSuchMethodException, InvocationTargetException {
@@ -279,11 +279,11 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
     public class SingletonProviderConfig<T> implements ProviderConfig<T> {
         private Class<? extends Provider<T>> providerClass;
         private T instance;
-    
+
         public SingletonProviderConfig(Class<? extends Provider<T>> providerClass) {
             this.providerClass = providerClass;
         }
-    
+
         @Override
         public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
                 NoSuchMethodException, InvocationTargetException {
@@ -321,7 +321,7 @@ initialize() メソッドは､モジュールの初期化がすべて完了し�
 	public <T> void register(Class<T> type, ProviderConfig<T> providerConfig) {
 		providers.put(type, providerConfig);
 	}
-	
+
 ## 出来合いのインスタンスを渡したいんだけど｡｡
 
 すでに出来上がっているインスタンスを､単に DI で Inject したいというケースもあるでしょう｡
@@ -330,16 +330,16 @@ InstanceProviderConfig を定義します｡単に､インスタンスを返す
 
     public class InstanceProviderConfig<T> implements ProviderConfig<T> {
         private T instance;
-    
+
         public InstanceProviderConfig(T instance) {
             this.instance = instance;
         }
-    
+
         @Override
         public void initialize(final ToyDI di)
                 throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         }
-    
+
         @Override
         public T getInstance(ToyDI di) throws InstantiationException, IllegalAccessException,
                 NoSuchMethodException, InvocationTargetException {
@@ -348,22 +348,22 @@ InstanceProviderConfig を定義します｡単に､インスタンスを返す
     }
 
 最後に利用例です｡Instance を直接モジュールで設定します｡
-    
+
     	public static class BasicModule implements Module {
     		private final Foo foo;
-    
+
     		public BasicModule(Foo foo) {
     			this.foo = foo;
     		}
-    
+
     		@Override
     		public void configure(ToyDI di) throws InstantiationException, IllegalAccessException,
     				NoSuchMethodException, InvocationTargetException {
     			di.register(Foo.class, new InstanceProviderConfig<>(foo));
     		}
     	}
-	
-    	
+
+
 ## 設定は起動時に読み込んでほしい
 
 設定ファイルの読み込みを､必要になった時点で行うようにすると､設定ファイルのミスが失敗している時に問題解決が遅れることになる｡
@@ -377,27 +377,27 @@ EagerSingletonProviderConfig というクラスを設定します｡initialize �
     public class EagerSingletonProviderConfig<T> implements ProviderConfig<T> {
         private Class<? extends Provider<T>> providerClass;
         private T instance;
-    
+
         public EagerSingletonProviderConfig(final Class<? extends Provider<T>> providerClass) {
             this.providerClass = providerClass;
         }
-    
+
         @Override
         public void initialize(final ToyDI di)
                 throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
             Provider<T> provider = di.getInstance(providerClass);
             instance = provider.get();
         }
-    
+
         @Override
         public T getInstance(final ToyDI di)
                 throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
             return instance;
         }
     }
-	
+
 この機能を利用するためのコードは以下のようになるでしょう｡
-	
+
 	public static class BasicModule implements Module {
 		@Override
 		public void configure(ToyDI di) throws InstantiationException, IllegalAccessException,
@@ -424,7 +424,7 @@ EagerSingletonProviderConfig というクラスを設定します｡initialize �
 			return instanceCount;
 		}
 	}
-	
+
 ## 閑話休題｡ところで､@Inject や Provider ってどこから来てるの?
 
 javax.inject.Inject や javax.inject.Provider は JSR-330 で定義されております｡
@@ -461,9 +461,9 @@ JSR ってのは､Java 界の RFC みたいなやつです｡
 			return "Get!";
 		}
 	}
-	
-DI 側は以下のように､インジェクト対象が Provider であった場合には､遅延評価を行う lambda をインジェクトするようにします｡	
-	
+
+DI 側は以下のように､インジェクト対象が Provider であった場合には､遅延評価を行う lambda をインジェクトするようにします｡
+
 	private void instantiateMember(final Object object, final Field field)
 			throws IllegalAccessException, InstantiationException, NoSuchMethodException,
 			InvocationTargetException {
@@ -496,12 +496,11 @@ DI 側は以下のように､インジェクト対象が Provider であった�
 				throw new RuntimeException(e);
 			}
 		};
-	}	
-	
+	}
+
 ## 落穂ひろい
-	
+
 残っている処理としては以下のものがあるでしょう｡
-	
+
 	* @Named
 	* createChildInjector
-	
